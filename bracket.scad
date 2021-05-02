@@ -1,44 +1,54 @@
-// Thickness of the overall print
-thickness = 3;
+// Thickness of the rack ear plate
+plateThickness = 3;
+// Height of the rack ear plate
+plateHeight = 25;
 // Diameter of the rack ear mounting screws
-screwDiameter = 3;
+plateScrewDiameter = 3;
 // Space between each of the rack ear mounting screws
-screwSpacing = 76;
+plateScrewSpacing = 75;
+// Thickness of the mount
+mountThickness = 3;
+// Adjust the elevation of the bracket (min 0, max 90)
+mountAngle = 10;
 // Angle to rotate the mounting hole in order to hold the lamp level
-mountHoleAngle = 5;
+mountHoleAngle = 7.8;
 // 12mm for standard articulating lamps
 mountHoleDiameter = 12;
-// Height of the mounting shaft of your lamp
-mountHoleHeight = 30;
-// Distance from the mounting plate to place the mount hole
-mountHoleOffset = 3;
+// Height of the mounting shaft of your lamp (min 30)
+mountHoleHeight = 40;
 // Set to true to mirror the bracket
-mirrorBracket = true;
+mirrorBracket = false;
 
-screwRadius = screwDiameter / 2;
+plateScrewRadius = plateScrewDiameter / 2;
 mountHoleRadius = mountHoleDiameter / 2;
+mountHeight = mountHoleRadius + mountThickness;
 
 $fn = 50;
 
 module plate_shape()
 {
-    difference()
+    translate([-plateScrewSpacing / 2, -plateScrewRadius - plateThickness, 0])
+        difference()
     {
         hull()
         {
-            circle(screwRadius + thickness);
+            circle(plateScrewRadius + plateThickness);
 
-            translate([screwSpacing, 0, 0])
-                circle(screwRadius + thickness);
-            
-            translate([screwSpacing / 2, -(mountHoleHeight / 2) + screwRadius + thickness, 0])
-                circle(mountHoleHeight / 2);
+            translate([plateScrewSpacing, 0, 0])
+                circle(plateScrewRadius + plateThickness);
+
+            translate([
+                (plateScrewSpacing / 2) + ((plateHeight / 2) * sin(mountHoleAngle)),
+                -(plateHeight / 2) + plateScrewRadius + plateThickness,
+                0
+            ])
+                circle(plateHeight / 2);
         }
 
-        circle(screwRadius);
+        circle(plateScrewRadius);
 
-        translate([screwSpacing, 0, 0])
-            circle(screwRadius);
+        translate([plateScrewSpacing, 0, 0])
+            circle(plateScrewRadius);
     }
 }
 
@@ -46,93 +56,112 @@ module mount_shape()
 {
     difference()
     {
-        union()
-        {
-            // Outer curve
-            circle(mountHoleRadius + thickness);
+        translate([0, (mountHoleRadius + mountThickness) / 2, 0])
+            square(
+                [
+                    (mountHoleRadius + mountThickness) * 4,
+                    mountHoleRadius + mountThickness
+                ],
+                true
+            );
 
-            // Square base
-            translate([
-                0, (mountHoleRadius + mountHoleOffset + thickness) / 2, 0
-            ])
-                square([
-                    (mountHoleRadius + thickness) * 2,
-                    mountHoleRadius + mountHoleOffset + thickness
-                ], true);
+        translate([
+            -mountHoleDiameter - mountThickness - mountThickness,
+            0,
+            0
+        ])
+            circle(mountHoleRadius + mountThickness);
 
-            // Right hand corner
-            translate([
-                mountHoleRadius + (thickness * 1.5),
-                mountHoleRadius + mountHoleOffset + (thickness / 2),
-                0
-            ])
-                difference()
-            {
-                square(thickness, true);
-                translate([thickness / 2, -thickness / 2, 0])
-                    circle(thickness);
-            }
+        translate([
+            mountHoleDiameter + mountThickness + mountThickness,
+            0,
+            0
+        ])
+            circle(mountHoleRadius + mountThickness);
 
-            // Left hand corner
-            translate([
-                -mountHoleRadius - (thickness * 1.5),
-                mountHoleRadius + mountHoleOffset + (thickness / 2),
-                0
-            ])
-                difference()
-            {
-                square(thickness, true);
-                translate([-thickness / 2, -thickness / 2, 0])
-                circle(thickness);
-            }
-        }
-
-        circle(mountHoleRadius);
+        translate([0, 0, 0])
+            circle(mountHoleRadius + mountThickness);
     }
 }
 
 module bracket()
 {
-    translate([0, 0, screwRadius + thickness])
-        rotate([-90, 0, 0])
-    {
-        linear_extrude(thickness)
-            plate_shape();
+    // Plate
+    rotate([-90, 0, 0])
+        linear_extrude(plateThickness)
+        plate_shape();
 
-        intersection()
+    // Mount
+    intersection()
+    {
+        rotate([0, mountHoleAngle, 0])
+            union()
+        {
+            difference()
+            {
+                translate([0, -mountHeight, -mountHoleHeight])
+                    linear_extrude(mountHoleHeight + plateHeight, convexity = 5)
+                    mount_shape();
+
+                rotate([0, -mountHoleAngle, 0])
+                    multmatrix([
+                        [1, 0, 0, 0],
+                        [0, 1, 0, 0],
+                        [0, sin(mountAngle), 1, 0],
+                    ])
+                    translate([
+                        0,
+                        -(plateScrewSpacing) + plateThickness,
+                        -plateScrewSpacing,
+                    ])
+                    cube(plateScrewSpacing * 2, true);
+            }
+
+            cylHeight = mountHoleHeight + (mountHoleHeight * sin(mountAngle));
+
+            translate([
+                0,
+                -mountHoleRadius - mountThickness,
+                -(cylHeight / 2)
+            ])
+                difference()
+            {
+                cylinder(cylHeight + plateHeight, mountHoleRadius + mountThickness, mountHoleRadius + mountThickness);
+                translate([0, 0, -mountThickness])
+                    cylinder(mountHoleHeight + mountThickness, mountHoleRadius, mountHoleRadius);
+            }
+        }
+
+        union()
         {
             translate([
-                screwSpacing / 2,
-                -mountHoleHeight,
-                mountHoleDiameter + mountHoleOffset
+                0,
+                -(plateScrewSpacing) + plateThickness,
+                -plateScrewSpacing,
             ])
-                rotate([-90, 0, -mountHoleAngle])
-                linear_extrude(mountHoleHeight * 2, convexity = 5)
-                mount_shape();
+                cube(plateScrewSpacing * 2, true);
 
-            linear_extrude(mountHoleHeight + mountHoleOffset)
-                plate_shape();
-            
-            translate([0, 0, thickness])
-                multmatrix([
-                    [1, 0, 0, 0],
-                    [0, 1, 0.25, 0],
-                    [0, 0, 1, 0],
-                ])
-                linear_extrude(mountHoleHeight + mountHoleOffset, convexity = 5)
-                plate_shape();
+            multmatrix([
+                [1, 0, 0, 0],
+                [0, 1, 0, 0],
+                [0, sin(mountAngle), 1, 0],
+            ])
+                translate([
+                    0,
+                    -plateScrewSpacing, 0])
+                    rotate([-90, 0, 0])
+                    linear_extrude(plateScrewSpacing, convexity = 5)
+                    plate_shape();
         }
     }
 }
 
 if (mirrorBracket)
 {
-    translate([screwSpacing / 2, 0, 0])
-        rotate([0, 0, 180])
+    rotate([0, 0, 180])
         bracket();
 }
 else
 {
-    translate([-screwSpacing / 2, 0, 0])
         bracket();
 }
